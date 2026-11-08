@@ -1,0 +1,6 @@
+node_modules/
+.env
+dist/
+*.log
+docs/GHAZAL_JEWELLERY_API_DATABASE_DOCUMENTATION.pdf
+

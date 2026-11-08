@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model addresses {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @db.Uuid
+  full_name     String   @db.VarChar(150)
+  phone         String   @db.VarChar(20)
+  address_line1 String
+  address_line2 String?
+  city          String   @db.VarChar(100)
+  state         String   @db.VarChar(100)
+  pincode       String   @db.VarChar(10)
+  country       String   @default("India") @db.VarChar(100)
+  is_default    Boolean  @default(false)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  users         users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_addresses_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cart_items {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cart_id          String           @db.Uuid
+  variant_id       String           @db.Uuid
+  quantity         Int              @default(1)
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
+  carts            carts            @relation(fields: [cart_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  product_variants product_variants @relation(fields: [variant_id], references: [id], onUpdate: NoAction)
+
+  @@unique([cart_id, variant_id])
+  @@index([cart_id], map: "idx_cart_items_cart")
+}
+
+model carts {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String       @unique @db.Uuid
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at DateTime     @default(now()) @db.Timestamptz(6)
+  cart_items cart_items[]
+  users      users        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model categories {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @db.VarChar(100)
+  slug        String     @unique @db.VarChar(120)
+  description String?
+  image_url   String?
+  is_active   Boolean    @default(true)
+  created_at  DateTime   @default(now()) @db.Timestamptz(6)
+  products    products[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model order_items {
+  id                      String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id                String            @db.Uuid
+  product_id              String?           @db.Uuid
+  variant_id              String?           @db.Uuid
+  product_name            String            @db.VarChar(200)
+  variant_details         Json?
+  sku                     String?           @db.VarChar(100)
+  quantity                Int
+  price_at_purchase_paise BigInt
+  created_at              DateTime          @default(now()) @db.Timestamptz(6)
+  orders                  orders            @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products                products?         @relation(fields: [product_id], references: [id], onUpdate: NoAction)
+  product_variants        product_variants? @relation(fields: [variant_id], references: [id], onUpdate: NoAction)
+
+  @@index([order_id], map: "idx_order_items_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model orders {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_number       String        @unique @db.VarChar(50)
+  user_id            String        @db.Uuid
+  status             order_status  @default(PENDING)
+  subtotal_paise     BigInt
+  shipping_paise     BigInt        @default(0)
+  discount_paise     BigInt        @default(0)
+  total_amount_paise BigInt
+  shipping_address   Json
+  created_at         DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime      @default(now()) @db.Timestamptz(6)
+  order_items        order_items[]
+  users              users         @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  payments           payments[]
+
+  @@index([created_at(sort: Desc)], map: "idx_orders_created")
+  @@index([status], map: "idx_orders_status")
+  @@index([user_id], map: "idx_orders_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model payments {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id         String         @db.Uuid
+  amount_paise     BigInt
+  payment_method   String?        @db.VarChar(50)
+  status           payment_status @default(PENDING)
+  gateway          String?        @db.VarChar(50)
+  gateway_order_id String?        @unique @db.VarChar(150)
+  transaction_id   String?        @unique @db.VarChar(150)
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime       @default(now()) @db.Timestamptz(6)
+  orders           orders         @relation(fields: [order_id], references: [id], onUpdate: NoAction)
+
+  @@index([order_id], map: "idx_payments_order")
+}
+
+model product_images {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id    String   @db.Uuid
+  image_url     String
+  alt_text      String?  @db.VarChar(255)
+  is_primary    Boolean  @default(false)
+  display_order Int      @default(0)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  products      products @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([product_id], map: "idx_product_images_product")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model product_variants {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id   String        @db.Uuid
+  sku          String        @unique @db.VarChar(100)
+  size         String?       @db.VarChar(50)
+  material     String?       @db.VarChar(100)
+  color        String?       @db.VarChar(50)
+  weight_grams Decimal?      @db.Decimal(10, 3)
+  price_paise  BigInt
+  stock        Int           @default(0)
+  is_active    Boolean       @default(true)
+  created_at   DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime      @default(now()) @db.Timestamptz(6)
+  cart_items   cart_items[]
+  order_items  order_items[]
+  products     products      @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([product_id], map: "idx_variants_product")
+}
+
+model products {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String             @db.VarChar(200)
+  slug             String             @unique @db.VarChar(220)
+  description      String?
+  sku              String             @unique @db.VarChar(100)
+  material         String?            @db.VarChar(100)
+  is_active        Boolean            @default(true)
+  is_featured      Boolean            @default(false)
+  category_id      String             @db.Uuid
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  order_items      order_items[]
+  product_images   product_images[]
+  product_variants product_variants[]
+  categories       categories         @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+  wishlist_items   wishlist_items[]
+
+  @@index([is_active], map: "idx_products_active")
+  @@index([category_id], map: "idx_products_category")
+}
+
+model users {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String      @db.VarChar(150)
+  email      String      @unique @db.VarChar(255)
+  password   String      @db.VarChar(255)
+  phone      String?     @db.VarChar(20)
+  role       user_role   @default(CUSTOMER)
+  created_at DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at DateTime    @default(now()) @db.Timestamptz(6)
+  addresses  addresses[]
+  carts      carts?
+  orders     orders[]
+  wishlists  wishlists?
+}
+
+model wishlist_items {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wishlist_id String    @db.Uuid
+  product_id  String    @db.Uuid
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  products    products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  wishlists   wishlists @relation(fields: [wishlist_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([wishlist_id, product_id])
+}
+
+model wishlists {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String           @unique @db.Uuid
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  wishlist_items wishlist_items[]
+  users          users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum order_status {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum payment_status {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum user_role {
+  CUSTOMER
+  ADMIN
+}
