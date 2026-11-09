@@ -1,0 +1,805 @@
+openapi: 3.0.3
+info:
+  title: Ghazal Jewellery REST API
+  description: Complete REST API backend specification for Ghazal Jewellery luxury e-commerce platform.
+  version: 1.0.0
+  contact:
+    name: Ghazal Jewellery Engineering Team
+servers:
+  - url: http://localhost:3000/api
+    description: Local Development Server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns service status, uptime, and database connectivity.
+      tags: [System]
+      responses:
+        '200':
+          description: Service is healthy
+        '503':
+          description: Service degraded or database unavailable
+
+  /auth/register:
+    post:
+      summary: Customer Registration
+      description: Register a new customer account. Enforces role=CUSTOMER and initializes shopping cart and wishlist.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, example: "Amina Begum" }
+                email: { type: string, format: email, example: "amina@example.com" }
+                password: { type: string, minLength: 8, example: "SecurePass123!" }
+                phone: { type: string, example: "+91 9876543210" }
+      responses:
+        '201':
+          description: Customer registered successfully
+        '409':
+          description: Email already registered
+        '422':
+          description: Validation error
+
+  /auth/login:
+    post:
+      summary: User Login
+      description: Login for customers and admins. Returns JWT token and sets HttpOnly cookie.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Login successful
+        '401':
+          description: Invalid email or password
+
+  /auth/logout:
+    post:
+      summary: User Logout
+      description: Clears HttpOnly session cookie.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /auth/me:
+    get:
+      summary: Current User Profile
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Profile fetched successfully
+        '401':
+          description: Unauthorized
+    patch:
+      summary: Update Profile
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                phone: { type: string }
+      responses:
+        '200':
+          description: Profile updated
+
+  /auth/change-password:
+    post:
+      summary: Change Password
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string }
+                new_password: { type: string, minLength: 8 }
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          description: Incorrect current password
+
+  /categories:
+    get:
+      summary: List Active Categories (Public)
+      tags: [Categories]
+      responses:
+        '200':
+          description: List of active categories
+
+  /categories/{slug}:
+    get:
+      summary: Get Category by Slug (Public)
+      tags: [Categories]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Category found
+        '404':
+          description: Category not found
+
+  /products:
+    get:
+      summary: Search and Filter Products (Public)
+      description: List active products with pagination, search, category filter, price filter, stock filter, and sorting.
+      tags: [Products]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: material
+          in: query
+          schema: { type: string }
+        - name: min_price
+          in: query
+          schema: { type: integer }
+        - name: max_price
+          in: query
+          schema: { type: integer }
+        - name: in_stock
+          in: query
+          schema: { type: string, enum: [true, false] }
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [newest, oldest, price_asc, price_desc, name_asc, name_desc] }
+      responses:
+        '200':
+          description: Products fetched successfully with pagination metadata
+
+  /products/featured:
+    get:
+      summary: Featured Products (Public)
+      tags: [Products]
+      responses:
+        '200':
+          description: Featured products list
+
+  /products/slug/{slug}:
+    get:
+      summary: Get Product by Slug (Public)
+      tags: [Products]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Product details
+        '404':
+          description: Product not found
+
+  /products/{id}:
+    get:
+      summary: Get Product by ID (Public)
+      tags: [Products]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Product details
+        '404':
+          description: Product not found
+
+  /addresses:
+    get:
+      summary: List Customer Delivery Addresses
+      tags: [Addresses]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Addresses list
+    post:
+      summary: Create Delivery Address
+      tags: [Addresses]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [full_name, phone, address_line1, city, state, pincode]
+              properties:
+                full_name: { type: string }
+                phone: { type: string }
+                address_line1: { type: string }
+                address_line2: { type: string }
+                city: { type: string }
+                state: { type: string }
+                pincode: { type: string, pattern: '^[1-9][0-9]{5}$' }
+                country: { type: string, default: "India" }
+                is_default: { type: boolean, default: false }
+      responses:
+        '201':
+          description: Address created
+
+  /addresses/{id}:
+    patch:
+      summary: Update Address
+      tags: [Addresses]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Address updated
+    delete:
+      summary: Delete Address
+      tags: [Addresses]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Address deleted
+
+  /addresses/{id}/default:
+    patch:
+      summary: Set Address as Default
+      tags: [Addresses]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Default address updated
+
+  /cart:
+    get:
+      summary: Get Shopping Cart
+      description: Returns cart items with live database prices and computed totals in paise.
+      tags: [Cart]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Cart details
+    delete:
+      summary: Clear Cart
+      tags: [Cart]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Cart cleared
+
+  /cart/items:
+    post:
+      summary: Add Item to Cart
+      tags: [Cart]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_id]
+              properties:
+                variant_id: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1, default: 1 }
+      responses:
+        '201':
+          description: Item added to cart
+        '400':
+          description: Insufficient stock or unavailable
+
+  /cart/items/{id}:
+    patch:
+      summary: Update Cart Item Quantity
+      tags: [Cart]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Cart updated
+    delete:
+      summary: Remove Item from Cart
+      tags: [Cart]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Item removed
+
+  /wishlist:
+    get:
+      summary: Get Customer Wishlist
+      tags: [Wishlist]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Wishlist items
+
+  /wishlist/items:
+    post:
+      summary: Add Product to Wishlist (Idempotent)
+      tags: [Wishlist]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties:
+                product_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Added to wishlist
+
+  /wishlist/items/{productId}:
+    delete:
+      summary: Remove Product from Wishlist
+      tags: [Wishlist]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Removed from wishlist
+
+  /orders:
+    post:
+      summary: Place Order (Checkout)
+      description: Atomically verifies stock, calculates totals on server, decrements inventory, creates order, and clears cart.
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                address_id: { type: string, format: uuid }
+                shipping_address:
+                  type: object
+                  properties:
+                    full_name: { type: string }
+                    phone: { type: string }
+                    address_line1: { type: string }
+                    address_line2: { type: string }
+                    city: { type: string }
+                    state: { type: string }
+                    pincode: { type: string }
+                    country: { type: string }
+                use_cart: { type: boolean, default: true }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [variant_id, quantity]
+                    properties:
+                      variant_id: { type: string, format: uuid }
+                      quantity: { type: integer, minimum: 1 }
+                payment_method: { type: string, default: "ONLINE" }
+      responses:
+        '201':
+          description: Order placed successfully
+        '400':
+          description: Insufficient inventory or invalid checkout data
+
+  /orders/my-orders:
+    get:
+      summary: Customer Orders List
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Orders list
+
+  /orders/{id}:
+    get:
+      summary: Customer Order Details
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Order details
+        '404':
+          description: Order not found
+
+  /orders/{id}/cancel:
+    post:
+      summary: Cancel Customer Order
+      description: Permitted only when order is PENDING or CONFIRMED. Restores inventory automatically and preserves order record.
+      tags: [Orders]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Order cancelled and stock restored
+        '400':
+          description: Order cannot be cancelled
+
+  /admin/dashboard/summary:
+    get:
+      summary: Executive Dashboard Summary
+      description: Returns revenue in paise, orders counts, low stock alerts, and customer counts.
+      tags: [Admin Dashboard]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Dashboard summary
+
+  /admin/dashboard/recent-orders:
+    get:
+      summary: Recent Orders Feed
+      tags: [Admin Dashboard]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Recent orders
+
+  /admin/dashboard/low-stock:
+    get:
+      summary: Low Stock Inventory Alerts
+      tags: [Admin Dashboard]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Low stock variants list
+
+  /admin/customers:
+    get:
+      summary: Registered Customers Directory
+      tags: [Admin Dashboard]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Customers list with order counts
+
+  /admin/products:
+    get:
+      summary: All Products (Active & Inactive)
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Complete product catalog
+    post:
+      summary: Create Product with Variants & Images
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '201':
+          description: Product created
+
+  /admin/products/{id}:
+    patch:
+      summary: Update Product Details
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Product updated
+    delete:
+      summary: Delete or Safely Deactivate Product
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Product deleted or deactivated
+
+  /admin/products/{id}/availability:
+    patch:
+      summary: Toggle Product Availability
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_active]
+              properties:
+                is_active: { type: boolean }
+      responses:
+        '200':
+          description: Product availability updated
+
+  /admin/products/{id}/variants:
+    post:
+      summary: Add Variant to Product
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Variant created
+
+  /admin/products/{id}/variants/{variantId}:
+    patch:
+      summary: Update Product Variant
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: variantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Variant updated
+    delete:
+      summary: Delete Product Variant
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: variantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Variant deleted
+
+  /admin/products/{id}/images:
+    post:
+      summary: Add Image to Product
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Image added
+
+  /admin/products/{id}/images/{imageId}:
+    delete:
+      summary: Delete Product Image
+      tags: [Admin Products]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: imageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Image deleted
+
+  /admin/categories:
+    get:
+      summary: All Categories (Admin)
+      tags: [Admin Categories]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: All categories
+    post:
+      summary: Create Category
+      tags: [Admin Categories]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '201':
+          description: Category created
+
+  /admin/categories/{id}:
+    patch:
+      summary: Update Category
+      tags: [Admin Categories]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Category updated
+    delete:
+      summary: Delete or Deactivate Category
+      tags: [Admin Categories]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Category deleted or deactivated
+
+  /admin/orders:
+    get:
+      summary: All Customer Orders (Admin)
+      tags: [Admin Orders]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED] }
+      responses:
+        '200':
+          description: Orders list
+
+  /admin/orders/{id}:
+    get:
+      summary: Full Order Details (Admin)
+      tags: [Admin Orders]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Complete order details
+
+  /admin/orders/{id}/status:
+    patch:
+      summary: Advance Order Status (Admin)
+      description: Enforces valid transition paths (PENDING -> CONFIRMED -> PROCESSING -> SHIPPED -> DELIVERED).
+      tags: [Admin Orders]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED]
+      responses:
+        '200':
+          description: Order status updated
+        '400':
+          description: Invalid transition attempt
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+
